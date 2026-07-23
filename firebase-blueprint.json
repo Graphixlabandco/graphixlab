@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "booking": {
+      "title": "Booking",
+      "description": "A client booking request for a design project.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The unique ID of the booking." },
+        "userId": { "type": "string", "description": "The ID of the user who made the booking." },
+        "clientName": { "type": "string", "description": "Name of the client." },
+        "clientEmail": { "type": "string", "description": "Email of the client." },
+        "serviceType": { "type": "string", "description": "Selected service (e.g. Brand Identity, UI/UX, 3D Graphics)." },
+        "bookingDate": { "type": "string", "format": "date-time", "description": "Desired date for the booking." },
+        "notes": { "type": "string", "description": "Client specifications or brief." },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"], "description": "Current status of the booking." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the booking was created." }
+      },
+      "required": ["id", "userId", "clientName", "clientEmail", "serviceType", "bookingDate", "status", "createdAt"]
+    },
+    "inquiry": {
+      "title": "Inquiry",
+      "description": "A general project contact form inquiry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of the inquiry." },
+        "name": { "type": "string", "description": "Name of the inquirer." },
+        "email": { "type": "string", "description": "Email of the inquirer." },
+        "subject": { "type": "string", "description": "Subject of the message." },
+        "message": { "type": "string", "description": "The detailed message content." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the inquiry was created." }
+      },
+      "required": ["id", "name", "email", "subject", "message", "createdAt"]
+    },
+    "user": {
+      "title": "User Profile",
+      "description": "User account profiles for clients and admin.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Authentication UID." },
+        "email": { "type": "string", "description": "User email address." },
+        "name": { "type": "string", "description": "User full name." },
+        "role": { "type": "string", "enum": ["client", "admin"], "description": "User authorization role." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the profile was created." }
+      },
+      "required": ["uid", "email", "name", "role", "createdAt"]
+    },
+    "client_request": {
+      "title": "Client Request",
+      "description": "Custom project ideas submitted by clients.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of the client request." },
+        "userName": { "type": "string", "description": "Name of the client who submitted." },
+        "projectDescription": { "type": "string", "description": "Detailed project description." },
+        "email": { "type": "string", "description": "Client email address." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the request was submitted." }
+      },
+      "required": ["id", "userName", "projectDescription", "email", "createdAt"]
+    },
+    "testimonial": {
+      "title": "Testimonial",
+      "description": "Client reviews and feedback on projects or services.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of the review." },
+        "name": { "type": "string", "description": "Name of the client." },
+        "subject": { "type": "string", "description": "Chosen project or service category." },
+        "message": { "type": "string", "description": "Detailed feedback or review." },
+        "rating": { "type": "integer", "minimum": 1, "maximum": 5, "description": "Rating in stars (1-5)." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the review was submitted." }
+      },
+      "required": ["id", "name", "subject", "message", "rating", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/bookings/{bookingId}": {
+      "schema": "booking",
+      "description": "Collection of all service bookings."
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": "inquiry",
+      "description": "Collection of contact form submissions."
+    },
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Collection of user registration profiles and roles."
+    },
+    "/client_requests/{requestId}": {
+      "schema": "client_request",
+      "description": "Collection of custom design and development ideas submitted by clients."
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": "testimonial",
+      "description": "Collection of public client testimonials and ratings."
+    }
+  }
+}

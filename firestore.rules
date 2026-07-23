@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global ID validation helper
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper to check if a user is logged in
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    // Helper to check if the user is an admin
+    function isAdmin() {
+      return isLoggedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      allow get: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      
+      // Allow create if they are writing their own profile (or admin)
+      allow create: if isLoggedIn() && (request.auth.uid == userId || isAdmin()) && isValidUser(request.resource.data);
+      allow update: if isLoggedIn() && (request.auth.uid == userId || isAdmin()) && isValidUserUpdate(request.resource.data, resource.data);
+      allow delete: if isAdmin();
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'name', 'role', 'createdAt']) &&
+             data.keys().size() == 5 &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 128 &&
+             data.role in ['client', 'admin'] &&
+             data.createdAt is string;
+    }
+
+    function isValidUserUpdate(newData, oldData) {
+      // Clients cannot change their own roles from client to admin
+      return newData.uid == oldData.uid &&
+             newData.email == oldData.email &&
+             newData.createdAt == oldData.createdAt &&
+             newData.name is string && newData.name.size() > 0 && newData.name.size() <= 128 &&
+             (newData.role == oldData.role || isAdmin());
+    }
+
+    // --- Bookings Collection ---
+    match /bookings/{bookingId} {
+      allow get: if isLoggedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isLoggedIn() && (isAdmin() || request.query.limit <= 100); // Admin can list all, client list guarded by query filtering or dashboard
+      
+      allow create: if isLoggedIn() && isValidId(bookingId) && isValidBooking(request.resource.data) && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isLoggedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidBookingUpdate(request.resource.data, resource.data);
+      allow delete: if isAdmin();
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['id', 'userId', 'clientName', 'clientEmail', 'serviceType', 'bookingDate', 'status', 'createdAt', 'notes']) &&
+             data.keys().size() == 9 &&
+             data.id is string &&
+             data.userId is string &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 128 &&
+             data.clientEmail is string && data.clientEmail.size() <= 256 &&
+             data.serviceType is string && data.serviceType.size() <= 128 &&
+             data.bookingDate is string &&
+             data.status in ['pending', 'confirmed', 'cancelled'] &&
+             data.createdAt is string &&
+             data.notes is string && data.notes.size() <= 1000;
+    }
+
+    function isValidBookingUpdate(newData, oldData) {
+      // Clients can only edit notes or reschedule if pending, or cancel their booking. Admin can edit status.
+      return newData.id == oldData.id &&
+             newData.userId == oldData.userId &&
+             newData.createdAt == oldData.createdAt &&
+             newData.clientEmail == oldData.clientEmail &&
+             newData.clientName == oldData.clientName &&
+             newData.serviceType == oldData.serviceType &&
+             (isAdmin() || (
+               newData.status == 'cancelled' || 
+               (oldData.status == 'pending' && newData.status == 'pending' && newData.bookingDate is string && newData.notes is string && newData.notes.size() <= 1000)
+             ));
+    }
+
+    // --- Inquiries Collection ---
+    match /inquiries/{inquiryId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      
+      // Guest or logged-in users can write inquiries (e.g. contact form)
+      allow create: if isValidId(inquiryId) && isValidInquiry(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    function isValidInquiry(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'subject', 'message', 'createdAt']) &&
+             data.keys().size() == 6 &&
+             data.id is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 128 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 256 &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 4000 &&
+             data.createdAt is string;
+    }
+
+    // --- Client Requests Collection ---
+    match /client_requests/{requestId} {
+      allow get, list: if isAdmin();
+      allow create: if isValidId(requestId) && isValidClientRequest(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    function isValidClientRequest(data) {
+      return data.keys().hasAll(['id', 'userName', 'projectDescription', 'email', 'createdAt']) &&
+             data.keys().size() == 5 &&
+             data.id is string &&
+             data.userName is string && data.userName.size() > 0 && data.userName.size() <= 128 &&
+             data.projectDescription is string && data.projectDescription.size() > 0 && data.projectDescription.size() <= 4000 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.createdAt is string;
+    }
+
+    // --- Testimonials Collection ---
+    match /testimonials/{testimonialId} {
+      allow get, list: if true; // Publicly viewable
+      allow create: if isValidId(testimonialId) && isValidTestimonial(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    function isValidTestimonial(data) {
+      return data.keys().hasAll(['id', 'name', 'subject', 'message', 'rating', 'createdAt']) &&
+             data.keys().size() == 6 &&
+             data.id is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 128 &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 256 &&
+             data.message is string && data.message.size() > 0 && data.message.size() <= 4000 &&
+             data.rating is int && data.rating >= 1 && data.rating <= 5 &&
+             data.createdAt is string;
+    }
+  }
+}
